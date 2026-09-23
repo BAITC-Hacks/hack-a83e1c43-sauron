@@ -1,3 +1,6 @@
+import os
+from unittest.mock import patch
+
 from django.core.management import call_command
 from django.test import TestCase
 from rest_framework import status
@@ -51,6 +54,7 @@ class TaskFlowAPITests(APITestCase):
             "interaction_format": "Созвон раз в неделю",
         }
 
+    @patch.dict(os.environ, {"AI_PROVIDER": "mock"})
     def test_analyze_returns_at_least_three_questions(self):
         response = self.client.post(
             "/api/v1/tasks/analyze/",

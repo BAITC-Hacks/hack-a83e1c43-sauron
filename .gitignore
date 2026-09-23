@@ -7,3 +7,11 @@ venv/
 staticfiles/
 media/
 .pytest_cache/
+node_modules/
+outputs/frontend/
+dist/
+artifacts/
+*.tsbuildinfo
+.env.local
+.env.*.local
+.tools/

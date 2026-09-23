@@ -9,6 +9,7 @@ class BusinessTask(models.Model):
         PUBLISHED = "published", "Опубликована"
         CLOSED = "closed", "Закрыта"
 
+    demo_key = models.CharField(max_length=40, null=True, blank=True, unique=True, editable=False)
     title = models.CharField(max_length=200, blank=True)
     draft_text = models.TextField(blank=True)
     industry = models.CharField(max_length=100, blank=True)
@@ -48,6 +49,7 @@ class BusinessTask(models.Model):
 
 
 class TeamProfile(models.Model):
+    demo_key = models.CharField(max_length=40, null=True, blank=True, unique=True, editable=False)
     name = models.CharField(max_length=120)
     interests = models.TextField(blank=True)
     skills = models.TextField(blank=True)
@@ -64,6 +66,7 @@ class Proposal(models.Model):
         ACCEPTED = "accepted", "Принято"
         REJECTED = "rejected", "Отклонено"
 
+    demo_key = models.CharField(max_length=40, null=True, blank=True, unique=True, editable=False)
     task = models.ForeignKey(BusinessTask, on_delete=models.CASCADE, related_name="proposals")
     team = models.ForeignKey(TeamProfile, on_delete=models.CASCADE, related_name="proposals")
     idea = models.TextField()

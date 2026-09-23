@@ -48,7 +48,13 @@ SCORING_RULES = (
 
 
 def has_value(value) -> bool:
-    return bool(value and str(value).strip())
+    if not isinstance(value, str):
+        return False
+    text = value.strip().casefold().strip(".!? ")
+    if text in {"test", "тест", "todo", "tbd", "asdf", "qwerty", "не знаю", "уточняется", "позже", "n/a"}:
+        return False
+    letters = [char for char in text if char.isalnum()]
+    return len(letters) >= 3 and len(set(letters)) >= 2
 
 
 def readiness_level(score: int) -> str:
@@ -101,6 +107,10 @@ def calculate_readiness(values: dict) -> dict:
         "score": total,
         "level": level,
         "level_label": readiness_label(level),
+        "quality_warnings": [
+            field for rule in SCORING_RULES for field in rule["fields"]
+            if values.get(field) and str(values[field]).strip() and not has_value(values[field])
+        ],
         "breakdown": breakdown,
         "missing_fields": [
             field

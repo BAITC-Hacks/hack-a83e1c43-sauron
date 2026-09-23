@@ -46,7 +46,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "dist"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -101,7 +101,9 @@ TIME_ZONE = "Asia/Almaty"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATICFILES_DIRS = [("ui", BASE_DIR / "dist")] if (BASE_DIR / "dist").exists() else []
+STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 if DEBUG and not os.getenv("CORS_ALLOWED_ORIGINS"):

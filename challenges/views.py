@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view
@@ -6,6 +7,7 @@ from rest_framework.response import Response
 from .models import BusinessTask, Proposal, TeamProfile
 from .serializers import (
     AnalyzeTaskSerializer,
+    CatalogFilterSerializer,
     ProposalDecisionSerializer,
     ProposalSerializer,
     TaskSerializer,
@@ -24,7 +26,7 @@ def analyze_task(request):
     serializer = AnalyzeTaskSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     try:
-        result = generate_clarifying_questions(serializer.validated_data["draft_text"])
+        result = generate_clarifying_questions(**serializer.validated_data)
     except ValueError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     return Response(result)
@@ -37,24 +39,36 @@ class BusinessTaskViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if self.action == "list" and self.request.query_params.get("include_drafts") != "true":
+        if self.action in {"publish", "partial_update"}:
+            return queryset.select_for_update()
+        if self.action != "list":
+            return queryset
+        filters = CatalogFilterSerializer(data=self.request.query_params)
+        filters.is_valid(raise_exception=True)
+        params = filters.validated_data
+        if not params["include_drafts"]:
             queryset = queryset.filter(status=BusinessTask.Status.PUBLISHED)
 
-        industry = self.request.query_params.get("industry")
-        readiness_level = self.request.query_params.get("readiness_level")
-        min_score = self.request.query_params.get("min_score")
-        max_score = self.request.query_params.get("max_score")
+        industry = params.get("industry")
+        readiness_level = params.get("readiness_level")
+        min_score = params.get("min_score")
+        max_score = params.get("max_score")
         if industry:
             queryset = queryset.filter(industry__iexact=industry)
         if readiness_level:
             queryset = queryset.filter(readiness_level=readiness_level)
-        if min_score:
+        if min_score is not None:
             queryset = queryset.filter(score__gte=min_score)
-        if max_score:
+        if max_score is not None:
             queryset = queryset.filter(score__lte=max_score)
         return queryset.order_by("-score", "-created_at")
 
+    @transaction.atomic
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
+
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def publish(self, request, pk=None):
         task = self.get_object()
         if request.data.get("confirmed") is not True:
@@ -62,6 +76,12 @@ class BusinessTaskViewSet(viewsets.ModelViewSet):
                 {"detail": "Перед публикацией требуется ручное подтверждение: confirmed=true."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if not task.title.strip():
+            return Response({"title": "Перед публикацией добавьте название задачи."}, status=status.HTTP_400_BAD_REQUEST)
+        if task.status == BusinessTask.Status.CLOSED:
+            return Response({"detail": "Закрытая задача недоступна для публикации."}, status=status.HTTP_400_BAD_REQUEST)
+        if task.status == BusinessTask.Status.PUBLISHED:
+            return Response(TaskSerializer(task).data)
         task.status = BusinessTask.Status.PUBLISHED
         task.published_at = timezone.now()
         task.save(update_fields=["status", "published_at"])
@@ -98,6 +118,11 @@ class ProposalViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["post"])
     def decision(self, request, pk=None):
         proposal = self.get_object()
+        if proposal.task.status != BusinessTask.Status.PUBLISHED:
+            return Response(
+                {"detail": "Решение по отклику доступно только для опубликованной задачи."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer = ProposalDecisionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         proposal.status = serializer.validated_data["decision"]
