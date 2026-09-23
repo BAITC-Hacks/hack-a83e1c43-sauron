@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: hackalem-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hackalem
+      POSTGRES_USER: hackalem
+      POSTGRES_PASSWORD: hackalem
+    ports:
+      - "5432:5432"
+    volumes:
+      - hackalem_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  hackalem_postgres_data:
